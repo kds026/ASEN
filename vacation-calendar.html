@@ -149,11 +149,15 @@
     font-size: 9px;
     font-weight: 400;
   }
-  .reset-btn {
-    display: block;
+  .btn-group {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
     margin: 30px auto;
+  }
+  .btn {
     padding: 12px 36px;
-    background: #e53935;
     color: #fff;
     border: none;
     border-radius: 8px;
@@ -162,7 +166,12 @@
     cursor: pointer;
     transition: background 0.2s;
   }
-  .reset-btn:hover { background: #c62828; }
+  .btn-save { background: #1a73e8; }
+  .btn-save:hover { background: #1558b0; }
+  .btn-load { background: #43a047; }
+  .btn-load:hover { background: #2e7d32; }
+  .btn-reset { background: #e53935; }
+  .btn-reset:hover { background: #c62828; }
 </style>
 </head>
 <body>
@@ -184,7 +193,12 @@
 
 <div id="calendars"></div>
 
-<button class="reset-btn" onclick="resetAll()">전체 초기화</button>
+<div class="btn-group">
+  <button class="btn btn-save" onclick="saveToFile()">파일로 저장</button>
+  <button class="btn btn-load" onclick="document.getElementById('fileInput').click()">불러오기</button>
+  <button class="btn btn-reset" onclick="resetAll()">전체 초기화</button>
+</div>
+<input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadFromFile(event)">
 
 <script>
 const MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
@@ -313,6 +327,40 @@ function renderCalendars() {
   }
 
   updateSummary();
+}
+
+function saveToFile() {
+  const data = { totalVacation, vacationData };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `휴가캘린더_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function loadFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.vacationData) vacationData = data.vacationData;
+      if (data.totalVacation != null) {
+        totalVacation = data.totalVacation;
+        totalInput.value = totalVacation;
+        localStorage.setItem('totalVacation', totalVacation);
+      }
+      save();
+      renderCalendars();
+      alert('불러오기 완료!');
+    } catch {
+      alert('파일 형식이 올바르지 않습니다.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 function resetAll() {
