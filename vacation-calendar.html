@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>휴가 캘린더 2026-2027</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f2f5;
+    color: #333;
+    padding: 20px;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .header h1 { font-size: 28px; color: #1a73e8; margin-bottom: 8px; }
+  .summary {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    background: #fff;
+    padding: 16px 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    font-size: 18px;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .summary .total { color: #1a73e8; }
+  .summary .used { color: #e53935; }
+  .summary .remaining { color: #43a047; }
+  .summary .remaining.over { color: #e53935; }
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    color: #666;
+  }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend-box {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+  .legend-box.half { background: #bbdefb; }
+  .legend-box.full { background: #1a73e8; }
+  .year-section { margin-bottom: 40px; }
+  .year-title {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 16px;
+  }
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .month-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 14px;
+  }
+  .month-name {
+    text-align: center;
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 8px;
+    color: #1a73e8;
+  }
+  .weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #999;
+    margin-bottom: 4px;
+  }
+  .days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, color 0.15s;
+    position: relative;
+  }
+  .day:hover { background: #e8eaf6; }
+  .day.empty { cursor: default; }
+  .day.empty:hover { background: transparent; }
+  .day.sunday { color: #e53935; }
+  .day.saturday { color: #1565c0; }
+  .day.half {
+    background: #bbdefb;
+    color: #0d47a1;
+    font-weight: 700;
+  }
+  .day.full {
+    background: #1a73e8;
+    color: #fff;
+    font-weight: 700;
+  }
+  .day.half::after, .day.full::after {
+    content: attr(data-label);
+    position: absolute;
+    bottom: 1px;
+    font-size: 8px;
+    font-weight: 400;
+  }
+  .reset-btn {
+    display: block;
+    margin: 30px auto;
+    padding: 12px 36px;
+    background: #e53935;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .reset-btn:hover { background: #c62828; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>휴가 캘린더 2026-2027</h1>
+</div>
+
+<div class="summary">
+  <span class="total">총 휴가: 35.5일</span>
+  <span class="used" id="used">사용: 0일</span>
+  <span class="remaining" id="remaining">잔여: 35.5일</span>
+</div>
+
+<div class="legend">
+  <span><span class="legend-box half"></span> 반차 (0.5일)</span>
+  <span><span class="legend-box full"></span> 연차 (1일)</span>
+</div>
+
+<div id="calendars"></div>
+
+<button class="reset-btn" onclick="resetAll()">전체 초기화</button>
+
+<script>
+const TOTAL_VACATION = 35.5;
+const MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+const WEEKDAYS = ['일','월','화','수','목','금','토'];
+
+// state: { "2026-3-15": 0.5, "2026-3-16": 1 }
+let vacationData = JSON.parse(localStorage.getItem('vacationData') || '{}');
+
+function save() {
+  localStorage.setItem('vacationData', JSON.stringify(vacationData));
+}
+
+function getDaysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function getFirstDayOfWeek(year, month) {
+  return new Date(year, month, 1).getDay();
+}
+
+function updateSummary() {
+  let used = 0;
+  for (const key in vacationData) {
+    used += vacationData[key];
+  }
+  const remaining = TOTAL_VACATION - used;
+  document.getElementById('used').textContent = `사용: ${used}일`;
+  const remEl = document.getElementById('remaining');
+  remEl.textContent = `잔여: ${remaining}일`;
+  remEl.className = 'remaining' + (remaining < 0 ? ' over' : '');
+}
+
+function handleDayClick(year, month, day) {
+  const key = `${year}-${month}-${day}`;
+  const current = vacationData[key] || 0;
+  if (current === 0) {
+    vacationData[key] = 0.5;
+  } else if (current === 0.5) {
+    vacationData[key] = 1;
+  } else {
+    delete vacationData[key];
+  }
+  save();
+  renderCalendars();
+}
+
+function renderCalendars() {
+  const container = document.getElementById('calendars');
+  container.innerHTML = '';
+
+  for (const year of [2026, 2027]) {
+    const section = document.createElement('div');
+    section.className = 'year-section';
+    section.innerHTML = `<div class="year-title">${year}년</div>`;
+    const grid = document.createElement('div');
+    grid.className = 'calendar-grid';
+
+    for (let month = 0; month < 12; month++) {
+      const card = document.createElement('div');
+      card.className = 'month-card';
+
+      let html = `<div class="month-name">${MONTH_NAMES[month]}</div>`;
+      html += '<div class="weekdays">';
+      WEEKDAYS.forEach(w => html += `<div>${w}</div>`);
+      html += '</div><div class="days">';
+
+      const firstDay = getFirstDayOfWeek(year, month);
+      const daysInMonth = getDaysInMonth(year, month);
+
+      for (let i = 0; i < firstDay; i++) {
+        html += '<div class="day empty"></div>';
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const key = `${year}-${month}-${d}`;
+        const val = vacationData[key] || 0;
+        const dayOfWeek = (firstDay + d - 1) % 7;
+        let cls = 'day';
+        if (val === 0.5) cls += ' half';
+        else if (val === 1) cls += ' full';
+        else if (dayOfWeek === 0) cls += ' sunday';
+        else if (dayOfWeek === 6) cls += ' saturday';
+
+        const label = val === 0.5 ? '0.5' : val === 1 ? '1' : '';
+        html += `<div class="${cls}" data-label="${label}" onclick="handleDayClick(${year},${month},${d})">${d}</div>`;
+      }
+
+      html += '</div>';
+      card.innerHTML = html;
+      grid.appendChild(card);
+    }
+
+    section.appendChild(grid);
+    container.appendChild(section);
+  }
+
+  updateSummary();
+}
+
+function resetAll() {
+  if (confirm('모든 휴가 데이터를 초기화하시겠습니까?')) {
+    vacationData = {};
+    save();
+    renderCalendars();
+  }
+}
+
+renderCalendars();
+</script>
+</body>
+</html>
