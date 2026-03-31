@@ -20,6 +20,7 @@
   .summary {
     display: flex;
     justify-content: center;
+    align-items: center;
     gap: 30px;
     flex-wrap: wrap;
     margin-bottom: 20px;
@@ -33,10 +34,27 @@
     top: 0;
     z-index: 100;
   }
-  .summary .total { color: #1a73e8; }
+  .summary .total-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #1a73e8;
+  }
   .summary .used { color: #e53935; }
   .summary .remaining { color: #43a047; }
   .summary .remaining.over { color: #e53935; }
+  #totalInput {
+    width: 70px;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    border: 2px solid #1a73e8;
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: #1a73e8;
+    outline: none;
+  }
+  #totalInput:focus { border-color: #0d47a1; background: #e3f2fd; }
   .legend {
     display: flex;
     justify-content: center;
@@ -153,9 +171,9 @@
 </div>
 
 <div class="summary">
-  <span class="total">총 휴가: 35.5일</span>
+  <span class="total-wrap">총 휴가: <input type="number" id="totalInput" step="0.5" min="0">일</span>
   <span class="used" id="used">사용: 0일</span>
-  <span class="remaining" id="remaining">잔여: 35.5일</span>
+  <span class="remaining" id="remaining">잔여: 0일</span>
 </div>
 
 <div class="legend">
@@ -168,12 +186,35 @@
 <button class="reset-btn" onclick="resetAll()">전체 초기화</button>
 
 <script>
-const TOTAL_VACATION = 35.5;
 const MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const WEEKDAYS = ['일','월','화','수','목','금','토'];
 
-// state: { "2026-3-15": 0.5, "2026-3-16": 1 }
+// 2026년 3월 ~ 2027년 2월
+const CALENDAR_MONTHS = [
+  { year: 2026, month: 2 },  // 3월
+  { year: 2026, month: 3 },  // 4월
+  { year: 2026, month: 4 },  // 5월
+  { year: 2026, month: 5 },  // 6월
+  { year: 2026, month: 6 },  // 7월
+  { year: 2026, month: 7 },  // 8월
+  { year: 2026, month: 8 },  // 9월
+  { year: 2026, month: 9 },  // 10월
+  { year: 2026, month: 10 }, // 11월
+  { year: 2026, month: 11 }, // 12월
+  { year: 2027, month: 0 },  // 1월
+  { year: 2027, month: 1 },  // 2월
+];
+
 let vacationData = JSON.parse(localStorage.getItem('vacationData') || '{}');
+let totalVacation = parseFloat(localStorage.getItem('totalVacation') || '35.5');
+
+const totalInput = document.getElementById('totalInput');
+totalInput.value = totalVacation;
+totalInput.addEventListener('change', function() {
+  totalVacation = parseFloat(this.value) || 0;
+  localStorage.setItem('totalVacation', totalVacation);
+  updateSummary();
+});
 
 function save() {
   localStorage.setItem('vacationData', JSON.stringify(vacationData));
@@ -192,7 +233,7 @@ function updateSummary() {
   for (const key in vacationData) {
     used += vacationData[key];
   }
-  const remaining = TOTAL_VACATION - used;
+  const remaining = totalVacation - used;
   document.getElementById('used').textContent = `사용: ${used}일`;
   const remEl = document.getElementById('remaining');
   remEl.textContent = `잔여: ${remaining}일`;
@@ -217,14 +258,21 @@ function renderCalendars() {
   const container = document.getElementById('calendars');
   container.innerHTML = '';
 
-  for (const year of [2026, 2027]) {
+  // Group by year
+  const years = {};
+  CALENDAR_MONTHS.forEach(m => {
+    if (!years[m.year]) years[m.year] = [];
+    years[m.year].push(m.month);
+  });
+
+  for (const year of Object.keys(years)) {
     const section = document.createElement('div');
     section.className = 'year-section';
     section.innerHTML = `<div class="year-title">${year}년</div>`;
     const grid = document.createElement('div');
     grid.className = 'calendar-grid';
 
-    for (let month = 0; month < 12; month++) {
+    for (const month of years[year]) {
       const card = document.createElement('div');
       card.className = 'month-card';
 
@@ -233,8 +281,8 @@ function renderCalendars() {
       WEEKDAYS.forEach(w => html += `<div>${w}</div>`);
       html += '</div><div class="days">';
 
-      const firstDay = getFirstDayOfWeek(year, month);
-      const daysInMonth = getDaysInMonth(year, month);
+      const firstDay = getFirstDayOfWeek(parseInt(year), month);
+      const daysInMonth = getDaysInMonth(parseInt(year), month);
 
       for (let i = 0; i < firstDay; i++) {
         html += '<div class="day empty"></div>';
